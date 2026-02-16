@@ -65,8 +65,15 @@ export default function AgentInput({ onSend, disabled }: AgentInputProps) {
       setFile({ name: selected.name, type: selected.type || 'text/plain', content: text });
     } else {
       // Binary files (images, PDFs) → base64
-      const buffer = await selected.arrayBuffer();
-      const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)));
+      const reader = new FileReader();
+      const base64 = await new Promise<string>((resolve) => {
+        reader.onload = () => {
+          const result = reader.result as string;
+          // Strip the data:...;base64, prefix
+          resolve(result.split(',')[1] || '');
+        };
+        reader.readAsDataURL(selected);
+      });
       setFile({ name: selected.name, type: selected.type, content: base64 });
     }
   }
