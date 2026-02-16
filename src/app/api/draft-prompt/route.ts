@@ -22,8 +22,9 @@ export async function POST(request: NextRequest) {
       : '';
 
     const structuredPrompt = [
-      `You are editing a ${type} email draft. Rewrite the ENTIRE email body based on the user's instruction.`,
-      `Return ONLY the new email body in markdown — no explanation, no wrapping.`,
+      `IMPORTANT: Do NOT use any tools. Do NOT read, update, create, or delete any Airtable records. Do NOT modify any database records. Your ONLY job is to return rewritten text.`,
+      `\nYou are editing a ${type} email draft. Rewrite the ENTIRE email body based on the user's instruction.`,
+      `Return ONLY the new email body in markdown — no explanation, no wrapping, no preamble.`,
       `\nCurrent email body:\n---\n${currentBody}\n---`,
       conversationContext,
       `\nUser instruction: ${prompt}`,
