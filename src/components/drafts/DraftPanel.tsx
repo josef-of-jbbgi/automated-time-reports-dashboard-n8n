@@ -35,14 +35,14 @@ export default function DraftPanel({ type }: DraftPanelProps) {
 
   // Check if any draft of this type has been sent
   const sentDraft = drafts.find(d => d.draftStatus === 'Sent');
+  const sentTime = type === 'Time-In' ? dailyLog?.timeInSentAt : dailyLog?.timeOutSentAt;
 
   // Status rendering
   function renderStatus() {
     if (sentDraft) {
-      const sentTime = sentDraft.generatedAt ? formatTime(sentDraft.generatedAt) : '';
       return (
         <span className="text-xs text-[var(--success)] flex items-center gap-1">
-          &#10003; Sent{sentTime ? ` at ${sentTime}` : ''}
+          &#10003; Sent
         </span>
       );
     }
@@ -117,6 +117,22 @@ export default function DraftPanel({ type }: DraftPanelProps) {
         {renderStatus()}
       </div>
 
+      {sentDraft && (
+        <div className="flex items-center gap-3 rounded-md border border-green-800/50 bg-green-900/30 px-4 py-3 mb-4">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-green-900/50 text-green-400">
+            &#10003;
+          </span>
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-green-300">
+              {type} sent{sentTime ? ` at ${formatTime(sentTime)}` : ''}
+            </p>
+            <p className="text-xs text-green-400/60 truncate">
+              {sentDraft.draftTitle}
+            </p>
+          </div>
+        </div>
+      )}
+
       {isLoading ? (
         <div className="space-y-3">
           <Skeleton className="h-4 w-32" />
@@ -128,7 +144,7 @@ export default function DraftPanel({ type }: DraftPanelProps) {
           description={isLocked ? undefined : `Drafts will generate at ${type === 'Time-In' ? '7:30 AM' : '5:00 PM'}`}
         />
       ) : displayDraft ? (
-        <div className="space-y-4">
+        <div className={`space-y-4${sentDraft ? ' opacity-50' : ''}`}>
           <DraftVersionDropdown
             drafts={drafts}
             selectedVersion={selectedVersion}
