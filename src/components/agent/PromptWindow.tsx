@@ -43,7 +43,7 @@ export default function PromptWindow() {
           Ask the AI agent to add tasks, update status, or re-draft your emails.
         </p>
       ) : (
-        <div className="mt-4 space-y-3 max-h-64 overflow-y-auto">
+        <div className="mt-4 space-y-3 max-h-[28rem] overflow-y-auto">
           {messages.map(msg => (
             <AgentMessage key={msg.id} message={msg} />
           ))}
