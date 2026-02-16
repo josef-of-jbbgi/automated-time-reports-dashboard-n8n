@@ -24,18 +24,21 @@ export default function DraftPanel({ type }: DraftPanelProps) {
   const { dailyLog, mutate: mutateDailyLog } = useDailyLog();
   const { toast } = useToast();
 
-  const [selectedVersion, setSelectedVersion] = useState('Version A');
+  const [selectedVersion, setSelectedVersion] = useState('');
   const [editorOpen, setEditorOpen] = useState(false);
   const [showSentBody, setShowSentBody] = useState(false);
   const [conversationHistory, setConversationHistory] = useState<PromptMessage[]>([]);
 
-  const selectedDraft = drafts.find(d => d.versionLabel === selectedVersion) || drafts[0];
+  // Only show drafts that have body content
+  const availableDrafts = drafts.filter(d => d.body.trim().length > 0);
+
+  const selectedDraft = availableDrafts.find(d => d.versionLabel === selectedVersion) || availableDrafts[0];
 
   useEffect(() => {
-    if (drafts.length > 0 && !drafts.find(d => d.versionLabel === selectedVersion)) {
-      setSelectedVersion(drafts[0].versionLabel);
+    if (availableDrafts.length > 0 && !availableDrafts.find(d => d.versionLabel === selectedVersion)) {
+      setSelectedVersion(availableDrafts[0].versionLabel);
     }
-  }, [drafts, selectedVersion]);
+  }, [availableDrafts, selectedVersion]);
 
   // Check if any draft of this type has been sent
   const sentDraft = drafts.find(d => d.draftStatus === 'Sent');
@@ -57,7 +60,7 @@ export default function DraftPanel({ type }: DraftPanelProps) {
       );
     }
 
-    if (drafts.length > 0) {
+    if (availableDrafts.length > 0) {
       return (
         <span className="text-xs text-[var(--success)] flex items-center gap-1">
           <span className="inline-block w-2 h-2 rounded-full bg-[var(--success)]" />
@@ -178,7 +181,7 @@ export default function DraftPanel({ type }: DraftPanelProps) {
           <Skeleton className="h-4 w-32" />
           <Skeleton className="h-40 w-full" />
         </div>
-      ) : drafts.length === 0 || isLocked ? (
+      ) : availableDrafts.length === 0 || isLocked ? (
         <EmptyState
           title={isLocked ? 'Send Time-In first' : `No drafts available`}
           description={isLocked ? undefined : `Drafts will generate at ${type === 'Time-In' ? '7:30 AM' : '5:00 PM'}`}
@@ -186,7 +189,7 @@ export default function DraftPanel({ type }: DraftPanelProps) {
       ) : selectedDraft ? (
         <div className="space-y-4">
           <DraftVersionDropdown
-            drafts={drafts}
+            drafts={availableDrafts}
             selectedVersion={selectedVersion}
             onVersionChange={setSelectedVersion}
           />
@@ -206,7 +209,7 @@ export default function DraftPanel({ type }: DraftPanelProps) {
 
       <DraftEditorModal
         isOpen={editorOpen}
-        drafts={drafts}
+        drafts={availableDrafts}
         initialVersion={selectedVersion}
         type={type}
         sendLocked={isSendTimeLocked}

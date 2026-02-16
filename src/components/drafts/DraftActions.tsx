@@ -63,7 +63,6 @@ export default function DraftActions({
           variant="ghost"
           size="sm"
           onClick={onToggleEdit}
-          disabled={!isGenerated}
         >
           Edit
         </Button>
