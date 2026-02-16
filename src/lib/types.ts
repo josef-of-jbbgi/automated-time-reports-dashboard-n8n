@@ -71,6 +71,12 @@ export interface MiddayAgentResponse {
   draftsUpdated: boolean;
 }
 
+// ─── AI Prompt Conversation ───
+export interface PromptMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
 // ─── Webhook Request Bodies ───
 export interface SendDraftRequest {
   draftRecordId: string;
