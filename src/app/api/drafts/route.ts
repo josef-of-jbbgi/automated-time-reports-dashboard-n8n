@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
 
     let formula = `DATESTR({Date})='${date}'`;
     if (type) {
-      formula = `AND(DATESTR({Date})='${date}', {Type}='${type}', {Draft Status}='Generated')`;
+      formula = `AND(DATESTR({Date})='${date}', {Type}='${type}')`;
     }
 
     const records = await fetchRecords(TABLE, {
