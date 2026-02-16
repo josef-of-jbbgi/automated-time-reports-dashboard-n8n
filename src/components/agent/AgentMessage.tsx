@@ -20,7 +20,7 @@ export default function AgentMessage({ message }: AgentMessageProps) {
           }
         `}
       >
-        <p className="whitespace-pre-wrap">{message.content}</p>
+        <p className="whitespace-pre-wrap break-words">{message.content}</p>
         {message.draftsUpdated && (
           <div className="mt-2 px-2 py-1 bg-blue-900/30 border border-blue-800/50 rounded text-xs text-blue-300">
             Drafts have been updated

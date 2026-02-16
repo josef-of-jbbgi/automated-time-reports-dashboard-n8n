@@ -35,7 +35,7 @@ export default function AgentInput({ onSend, disabled }: AgentInputProps) {
   }
 
   return (
-    <div className="flex gap-2 items-end">
+    <div className="flex gap-2 items-end min-w-0">
       <textarea
         ref={textareaRef}
         rows={2}

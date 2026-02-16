@@ -21,9 +21,7 @@ export default function PromptWindow() {
 
   async function handleSend(prompt: string) {
     const response = await sendMessage(prompt);
-    // Always revalidate tasks (agent may create/update tasks)
     mutateTasks();
-    // If drafts were updated, revalidate both draft types
     if (response?.draftsUpdated) {
       mutateTIDrafts();
       mutateTODrafts();
@@ -31,25 +29,27 @@ export default function PromptWindow() {
   }
 
   return (
-    <Card>
-      <h2 className="text-sm font-semibold text-[var(--text-secondary)] uppercase tracking-wide mb-3">
-        Prompt Window
-      </h2>
+    <Card className="overflow-hidden">
+      <div className="flex flex-col min-w-0">
+        <h2 className="text-sm font-semibold text-[var(--text-secondary)] uppercase tracking-wide mb-3">
+          Prompt Window
+        </h2>
 
-      <AgentInput onSend={handleSend} disabled={isLoading} />
+        {messages.length === 0 ? (
+          <p className="text-xs text-[var(--text-muted)] mb-4 text-center">
+            Ask the AI agent to add tasks, update status, or re-draft your emails.
+          </p>
+        ) : (
+          <div className="mb-4 space-y-3 max-h-[28rem] overflow-y-auto overflow-x-hidden min-w-0">
+            {messages.map(msg => (
+              <AgentMessage key={msg.id} message={msg} />
+            ))}
+            <div ref={messagesEndRef} />
+          </div>
+        )}
 
-      {messages.length === 0 ? (
-        <p className="text-xs text-[var(--text-muted)] mt-4 text-center">
-          Ask the AI agent to add tasks, update status, or re-draft your emails.
-        </p>
-      ) : (
-        <div className="mt-4 space-y-3 max-h-[28rem] overflow-y-auto">
-          {messages.map(msg => (
-            <AgentMessage key={msg.id} message={msg} />
-          ))}
-          <div ref={messagesEndRef} />
-        </div>
-      )}
+        <AgentInput onSend={handleSend} disabled={isLoading} />
+      </div>
     </Card>
   );
 }
