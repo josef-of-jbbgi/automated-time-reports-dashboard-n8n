@@ -4,12 +4,19 @@ import { useState, useEffect, useCallback } from 'react';
 import { MiddayAgentResponse } from '../types';
 import { getTodayDate } from '../utils';
 
+export interface FileAttachment {
+  name: string;
+  type: string;
+  content: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   timestamp: string;
   draftsUpdated?: boolean;
+  fileName?: string;
 }
 
 const STORAGE_KEY_PREFIX = 'agent-chat-';
@@ -33,7 +40,7 @@ function saveMessages(messages: ChatMessage[]) {
   try {
     localStorage.setItem(getStorageKey(), JSON.stringify(messages));
   } catch {
-    // Storage full or unavailable — silently ignore
+    // Storage full or unavailable
   }
 }
 
@@ -52,32 +59,37 @@ export function useAgent() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Load persisted messages on mount, clean old sessions
   useEffect(() => {
     setMessages(loadMessages());
     cleanOldSessions();
   }, []);
 
-  // Persist whenever messages change (skip initial empty state)
   const persistMessages = useCallback((msgs: ChatMessage[]) => {
     setMessages(msgs);
     if (msgs.length > 0) saveMessages(msgs);
   }, []);
 
-  async function sendMessage(prompt: string, type?: string): Promise<ChatMessage | null> {
+  async function sendMessage(prompt: string, file?: FileAttachment): Promise<ChatMessage | null> {
     const userMessage: ChatMessage = {
       id: `user-${Date.now()}`,
       role: 'user',
-      content: prompt,
+      content: prompt || (file ? `Attached: ${file.name}` : ''),
       timestamp: new Date().toISOString(),
+      fileName: file?.name,
     };
 
     persistMessages([...messages, userMessage]);
     setIsLoading(true);
 
     try {
-      const payload: Record<string, string> = { prompt };
-      if (type) payload.type = type;
+      const payload: Record<string, unknown> = { prompt: prompt || `Process the attached file: ${file?.name}` };
+      if (file) {
+        payload.file = {
+          name: file.name,
+          type: file.type,
+          content: file.content,
+        };
+      }
 
       const res = await fetch('/api/midday-agent', {
         method: 'POST',

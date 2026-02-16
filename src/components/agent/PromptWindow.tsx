@@ -6,6 +6,7 @@ import { useTasks } from '@/lib/hooks/useTasks';
 import { useDrafts } from '@/lib/hooks/useDrafts';
 import Card from '@/components/ui/Card';
 import AgentInput from './AgentInput';
+import type { FileAttachment } from './AgentInput';
 import AgentMessage from './AgentMessage';
 
 export default function PromptWindow() {
@@ -19,8 +20,8 @@ export default function PromptWindow() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  async function handleSend(prompt: string) {
-    const response = await sendMessage(prompt);
+  async function handleSend(prompt: string, file?: FileAttachment) {
+    const response = await sendMessage(prompt, file);
     mutateTasks();
     if (response?.draftsUpdated) {
       mutateTIDrafts();

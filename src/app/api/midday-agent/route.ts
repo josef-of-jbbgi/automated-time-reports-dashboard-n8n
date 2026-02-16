@@ -3,17 +3,34 @@ import { callWebhook } from '@/lib/n8n';
 import { N8N } from '@/lib/constants';
 import { MiddayAgentResponse } from '@/lib/types';
 
+interface FilePayload {
+  name: string;
+  type: string;
+  content: string;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { prompt, type } = body as { prompt: string; type?: string };
+    const { prompt, type, file } = body as {
+      prompt: string;
+      type?: string;
+      file?: FilePayload;
+    };
 
-    if (!prompt) {
-      return NextResponse.json({ error: 'prompt required' }, { status: 400 });
+    if (!prompt && !file) {
+      return NextResponse.json({ error: 'prompt or file required' }, { status: 400 });
     }
 
-    const payload: Record<string, unknown> = { prompt };
+    const payload: Record<string, unknown> = { prompt: prompt || '' };
     if (type) payload.type = type;
+    if (file) {
+      payload.file = {
+        name: file.name,
+        type: file.type,
+        content: file.content,
+      };
+    }
 
     const result = await callWebhook(N8N.ENDPOINTS.MIDDAY_AGENT, payload);
     // n8n Respond node returns array — extract the first item
