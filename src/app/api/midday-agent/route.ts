@@ -16,7 +16,9 @@ export async function POST(request: NextRequest) {
     if (type) payload.type = type;
 
     const result = await callWebhook(N8N.ENDPOINTS.MIDDAY_AGENT, payload);
-    return NextResponse.json(result as MiddayAgentResponse);
+    // n8n Respond node returns array — extract the first item
+    const data = Array.isArray(result) ? result[0] : result;
+    return NextResponse.json(data as MiddayAgentResponse);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json({ error: message }, { status: 500 });
