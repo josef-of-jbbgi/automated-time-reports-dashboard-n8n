@@ -9,29 +9,22 @@ import { useToast } from '@/components/ui/Toast';
 interface DraftActionsProps {
   draft: Draft;
   type: 'Time-In' | 'Time-Out';
-  isEditing: boolean;
   sendLocked?: boolean;
   sendLockedReason?: string;
   onToggleEdit: () => void;
-  onSaveEdit: () => Promise<void>;
-  onCancelEdit: () => void;
   onSendSuccess: () => void;
 }
 
 export default function DraftActions({
   draft,
   type,
-  isEditing,
   sendLocked,
   sendLockedReason,
   onToggleEdit,
-  onSaveEdit,
-  onCancelEdit,
   onSendSuccess,
 }: DraftActionsProps) {
   const [showModal, setShowModal] = useState(false);
   const [isSending, setIsSending] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
 
   const isGenerated = draft.draftStatus === 'Generated';
@@ -58,28 +51,6 @@ export default function DraftActions({
     } finally {
       setIsSending(false);
     }
-  }
-
-  async function handleSave() {
-    setIsSaving(true);
-    try {
-      await onSaveEdit();
-    } finally {
-      setIsSaving(false);
-    }
-  }
-
-  if (isEditing) {
-    return (
-      <div className="flex justify-end gap-2">
-        <Button variant="ghost" size="sm" onClick={onCancelEdit}>
-          Cancel
-        </Button>
-        <Button variant="primary" size="sm" onClick={handleSave} loading={isSaving}>
-          Save
-        </Button>
-      </div>
-    );
   }
 
   return (

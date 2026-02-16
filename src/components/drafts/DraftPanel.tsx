@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useDrafts } from '@/lib/hooks/useDrafts';
 import { useDailyLog } from '@/lib/hooks/useDailyLog';
 import { formatTime } from '@/lib/utils';
+import { PromptMessage } from '@/lib/types';
 import Card from '@/components/ui/Card';
 import Skeleton from '@/components/ui/Skeleton';
 import EmptyState from '@/components/ui/EmptyState';
@@ -11,6 +12,8 @@ import { useToast } from '@/components/ui/Toast';
 import DraftVersionDropdown from './DraftVersionDropdown';
 import DraftPreview from './DraftPreview';
 import DraftActions from './DraftActions';
+import DraftEditorModal from './DraftEditorModal';
+import MarkdownBody from '@/components/ui/MarkdownBody';
 
 interface DraftPanelProps {
   type: 'Time-In' | 'Time-Out';
@@ -22,9 +25,9 @@ export default function DraftPanel({ type }: DraftPanelProps) {
   const { toast } = useToast();
 
   const [selectedVersion, setSelectedVersion] = useState('Version A');
-  const [isEditing, setIsEditing] = useState(false);
-  const [editedBody, setEditedBody] = useState('');
+  const [editorOpen, setEditorOpen] = useState(false);
   const [showSentBody, setShowSentBody] = useState(false);
+  const [conversationHistory, setConversationHistory] = useState<PromptMessage[]>([]);
 
   const selectedDraft = drafts.find(d => d.versionLabel === selectedVersion) || drafts[0];
 
@@ -80,43 +83,36 @@ export default function DraftPanel({ type }: DraftPanelProps) {
   }, [type]);
   const isSendTimeLocked = type === 'Time-Out' && currentHour < 17;
 
-  function handleToggleEdit() {
-    if (!selectedDraft) return;
-    setEditedBody(selectedDraft.body);
-    setIsEditing(true);
+  // Modal callbacks
+  async function handleModalSave(draftId: string, body: string) {
+    const res = await fetch('/api/drafts', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: draftId, fields: { Body: body } }),
+    });
+    if (!res.ok) throw new Error('Save failed');
+    mutateDrafts();
   }
 
-  function handleCancelEdit() {
-    setIsEditing(false);
-    setEditedBody('');
-  }
-
-  async function handleSaveEdit() {
-    if (!selectedDraft) return;
-    try {
-      const res = await fetch('/api/drafts', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: selectedDraft.id, fields: { Body: editedBody } }),
-      });
-      if (!res.ok) throw new Error('Save failed');
-      setIsEditing(false);
-      mutateDrafts();
-      toast('Draft saved', 'success');
-    } catch {
-      toast('Failed to save edit', 'error');
-    }
+  async function handleModalSend(draftId: string) {
+    const endpoint = type === 'Time-In' ? '/api/send-time-in' : '/api/send-time-out';
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ draftRecordId: draftId }),
+    });
+    if (!res.ok) throw new Error('Send failed');
+    const data = await res.json();
+    const totalHoursInfo = data.totalHours ? ` · ${data.totalHours}h` : '';
+    toast(`${type} sent${totalHoursInfo}`, 'success');
+    mutateDrafts();
+    mutateDailyLog();
   }
 
   function handleSendSuccess() {
     mutateDrafts();
     mutateDailyLog();
   }
-
-  // Build a working draft object for preview (use editedBody when editing)
-  const displayDraft = selectedDraft
-    ? { ...selectedDraft, body: isEditing ? editedBody : selectedDraft.body }
-    : null;
 
   // Sent state — banner is the primary content, email body is collapsible
   if (sentDraft && !isLoading) {
@@ -154,12 +150,16 @@ export default function DraftPanel({ type }: DraftPanelProps) {
 
           {showSentBody && (
             <div className="mt-3 rounded border border-[var(--border)] bg-[var(--bg-secondary)] p-3">
-              <div className="text-sm text-[var(--text-muted)] whitespace-pre-wrap">
-                {sentDraft.body}
-              </div>
+              <MarkdownBody content={sentDraft.body} />
+              <p className="text-xs text-[var(--text-muted)] mt-3 italic">
+                Gmail signature appended automatically
+              </p>
             </div>
           )}
         </div>
+
+        {/* AI conversation history on sent panel */}
+        <ConversationSummary history={conversationHistory} />
       </Card>
     );
   }
@@ -183,34 +183,74 @@ export default function DraftPanel({ type }: DraftPanelProps) {
           title={isLocked ? 'Send Time-In first' : `No drafts available`}
           description={isLocked ? undefined : `Drafts will generate at ${type === 'Time-In' ? '7:30 AM' : '5:00 PM'}`}
         />
-      ) : displayDraft ? (
+      ) : selectedDraft ? (
         <div className="space-y-4">
           <DraftVersionDropdown
             drafts={drafts}
             selectedVersion={selectedVersion}
-            onVersionChange={(v) => {
-              setSelectedVersion(v);
-              setIsEditing(false);
-            }}
+            onVersionChange={setSelectedVersion}
           />
-          <DraftPreview
-            draft={displayDraft}
-            isEditing={isEditing}
-            onBodyChange={setEditedBody}
-          />
+          <DraftPreview draft={selectedDraft} />
           <DraftActions
             draft={selectedDraft}
             type={type}
-            isEditing={isEditing}
             sendLocked={isSendTimeLocked}
             sendLockedReason={isSendTimeLocked ? 'Available at 5:00 PM' : undefined}
-            onToggleEdit={handleToggleEdit}
-            onSaveEdit={handleSaveEdit}
-            onCancelEdit={handleCancelEdit}
+            onToggleEdit={() => setEditorOpen(true)}
             onSendSuccess={handleSendSuccess}
           />
+          {/* AI conversation history on main panel */}
+          <ConversationSummary history={conversationHistory} />
         </div>
       ) : null}
+
+      <DraftEditorModal
+        isOpen={editorOpen}
+        drafts={drafts}
+        initialVersion={selectedVersion}
+        type={type}
+        sendLocked={isSendTimeLocked}
+        sendLockedReason={isSendTimeLocked ? 'Available at 5:00 PM' : undefined}
+        conversationHistory={conversationHistory}
+        onClose={() => setEditorOpen(false)}
+        onSave={handleModalSave}
+        onSend={handleModalSend}
+        onConversationUpdate={setConversationHistory}
+      />
     </Card>
+  );
+}
+
+// ── Collapsible conversation summary shown on main panel ──
+function ConversationSummary({ history }: { history: PromptMessage[] }) {
+  const [open, setOpen] = useState(false);
+
+  if (history.length === 0) return null;
+
+  const userMessages = history.filter(m => m.role === 'user');
+
+  return (
+    <div className="mt-1">
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-1.5 text-xs text-purple-400 hover:text-purple-300 transition-colors"
+      >
+        <span className="text-[10px]">{open ? '▼' : '▶'}</span>
+        <span>✦</span>
+        {userMessages.length} AI edit{userMessages.length !== 1 ? 's' : ''}
+      </button>
+      {open && (
+        <div className="mt-2 space-y-1.5 pl-4">
+          {history.map((msg, i) => (
+            <div key={i} className="flex items-start gap-2 text-xs">
+              <span className={msg.role === 'user' ? 'text-[var(--text-muted)] shrink-0' : 'text-purple-400 shrink-0'}>
+                {msg.role === 'user' ? 'You:' : '✦'}
+              </span>
+              <span className="text-[var(--text-secondary)]">{msg.content}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
