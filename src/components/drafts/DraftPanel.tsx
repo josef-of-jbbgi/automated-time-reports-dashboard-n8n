@@ -24,6 +24,7 @@ export default function DraftPanel({ type }: DraftPanelProps) {
   const [selectedVersion, setSelectedVersion] = useState('Version A');
   const [isEditing, setIsEditing] = useState(false);
   const [editedBody, setEditedBody] = useState('');
+  const [showSentBody, setShowSentBody] = useState(false);
 
   const selectedDraft = drafts.find(d => d.versionLabel === selectedVersion) || drafts[0];
 
@@ -70,6 +71,15 @@ export default function DraftPanel({ type }: DraftPanelProps) {
 
   const isLocked = type === 'Time-Out' && dailyLog?.dayStatus !== 'Timed In' && dailyLog?.dayStatus !== 'Complete' && dailyLog?.dayStatus !== 'Timed Out';
 
+  // Time-Out send is locked until 5:00 PM
+  const [currentHour, setCurrentHour] = useState(new Date().getHours());
+  useEffect(() => {
+    if (type !== 'Time-Out') return;
+    const interval = setInterval(() => setCurrentHour(new Date().getHours()), 60_000);
+    return () => clearInterval(interval);
+  }, [type]);
+  const isSendTimeLocked = type === 'Time-Out' && currentHour < 17;
+
   function handleToggleEdit() {
     if (!selectedDraft) return;
     setEditedBody(selectedDraft.body);
@@ -108,6 +118,52 @@ export default function DraftPanel({ type }: DraftPanelProps) {
     ? { ...selectedDraft, body: isEditing ? editedBody : selectedDraft.body }
     : null;
 
+  // Sent state — banner is the primary content, email body is collapsible
+  if (sentDraft && !isLoading) {
+    return (
+      <Card>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-sm font-semibold text-[var(--text-secondary)] uppercase tracking-wide">
+            {type} Panel
+          </h2>
+          {renderStatus()}
+        </div>
+
+        <div className="rounded-md border border-green-800/50 bg-green-900/20 px-4 py-4">
+          <div className="flex items-center gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-green-900/50 text-green-400 text-lg">
+              &#10003;
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-green-300">
+                {type} sent{sentTime ? ` at ${formatTime(sentTime)}` : ''}
+              </p>
+              <p className="text-xs text-green-400/60 truncate mt-0.5">
+                {sentDraft.draftTitle}
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => setShowSentBody(!showSentBody)}
+            className="mt-3 flex items-center gap-1 text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
+          >
+            <span className="text-[10px]">{showSentBody ? '▼' : '▶'}</span>
+            View sent email
+          </button>
+
+          {showSentBody && (
+            <div className="mt-3 rounded border border-[var(--border)] bg-[var(--bg-secondary)] p-3">
+              <div className="text-sm text-[var(--text-muted)] whitespace-pre-wrap">
+                {sentDraft.body}
+              </div>
+            </div>
+          )}
+        </div>
+      </Card>
+    );
+  }
+
   return (
     <Card>
       <div className="flex items-center justify-between mb-4">
@@ -116,22 +172,6 @@ export default function DraftPanel({ type }: DraftPanelProps) {
         </h2>
         {renderStatus()}
       </div>
-
-      {sentDraft && (
-        <div className="flex items-center gap-3 rounded-md border border-green-800/50 bg-green-900/30 px-4 py-3 mb-4">
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-green-900/50 text-green-400">
-            &#10003;
-          </span>
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-green-300">
-              {type} sent{sentTime ? ` at ${formatTime(sentTime)}` : ''}
-            </p>
-            <p className="text-xs text-green-400/60 truncate">
-              {sentDraft.draftTitle}
-            </p>
-          </div>
-        </div>
-      )}
 
       {isLoading ? (
         <div className="space-y-3">
@@ -144,7 +184,7 @@ export default function DraftPanel({ type }: DraftPanelProps) {
           description={isLocked ? undefined : `Drafts will generate at ${type === 'Time-In' ? '7:30 AM' : '5:00 PM'}`}
         />
       ) : displayDraft ? (
-        <div className={`space-y-4${sentDraft ? ' opacity-50' : ''}`}>
+        <div className="space-y-4">
           <DraftVersionDropdown
             drafts={drafts}
             selectedVersion={selectedVersion}
@@ -158,17 +198,17 @@ export default function DraftPanel({ type }: DraftPanelProps) {
             isEditing={isEditing}
             onBodyChange={setEditedBody}
           />
-          {!sentDraft && (
-            <DraftActions
-              draft={selectedDraft}
-              type={type}
-              isEditing={isEditing}
-              onToggleEdit={handleToggleEdit}
-              onSaveEdit={handleSaveEdit}
-              onCancelEdit={handleCancelEdit}
-              onSendSuccess={handleSendSuccess}
-            />
-          )}
+          <DraftActions
+            draft={selectedDraft}
+            type={type}
+            isEditing={isEditing}
+            sendLocked={isSendTimeLocked}
+            sendLockedReason={isSendTimeLocked ? 'Available at 5:00 PM' : undefined}
+            onToggleEdit={handleToggleEdit}
+            onSaveEdit={handleSaveEdit}
+            onCancelEdit={handleCancelEdit}
+            onSendSuccess={handleSendSuccess}
+          />
         </div>
       ) : null}
     </Card>

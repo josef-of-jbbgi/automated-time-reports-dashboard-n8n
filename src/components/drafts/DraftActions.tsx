@@ -10,6 +10,8 @@ interface DraftActionsProps {
   draft: Draft;
   type: 'Time-In' | 'Time-Out';
   isEditing: boolean;
+  sendLocked?: boolean;
+  sendLockedReason?: string;
   onToggleEdit: () => void;
   onSaveEdit: () => Promise<void>;
   onCancelEdit: () => void;
@@ -20,6 +22,8 @@ export default function DraftActions({
   draft,
   type,
   isEditing,
+  sendLocked,
+  sendLockedReason,
   onToggleEdit,
   onSaveEdit,
   onCancelEdit,
@@ -80,7 +84,10 @@ export default function DraftActions({
 
   return (
     <>
-      <div className="flex justify-end gap-2">
+      <div className="flex items-center justify-end gap-2">
+        {sendLocked && sendLockedReason && (
+          <span className="text-xs text-[var(--text-muted)]">{sendLockedReason}</span>
+        )}
         <Button
           variant="ghost"
           size="sm"
@@ -93,7 +100,7 @@ export default function DraftActions({
           variant="primary"
           size="sm"
           onClick={() => setShowModal(true)}
-          disabled={!isGenerated}
+          disabled={!isGenerated || sendLocked}
         >
           Send
         </Button>
