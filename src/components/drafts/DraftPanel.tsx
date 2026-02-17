@@ -14,6 +14,7 @@ import DraftPreview from './DraftPreview';
 import DraftActions from './DraftActions';
 import DraftEditorModal from './DraftEditorModal';
 import MarkdownBody from '@/components/ui/MarkdownBody';
+import { useAgentStatus } from '@/lib/context/AgentContext';
 
 interface DraftPanelProps {
   type: 'Time-In' | 'Time-Out';
@@ -23,6 +24,7 @@ export default function DraftPanel({ type }: DraftPanelProps) {
   const { drafts, isLoading, mutate: mutateDrafts } = useDrafts(undefined, type);
   const { dailyLog, mutate: mutateDailyLog } = useDailyLog();
   const { toast } = useToast();
+  const { isProcessing } = useAgentStatus();
 
   const [selectedVersion, setSelectedVersion] = useState('');
   const [editorOpen, setEditorOpen] = useState(false);
@@ -62,6 +64,15 @@ export default function DraftPanel({ type }: DraftPanelProps) {
 
   // Status rendering
   function renderStatus() {
+    if (isProcessing) {
+      return (
+        <span className="text-xs text-purple-400 flex items-center gap-1">
+          <span className="inline-block w-2 h-2 rounded-full bg-purple-400 animate-pulse" />
+          Agent working...
+        </span>
+      );
+    }
+
     if (sentDraft) {
       return (
         <span className="text-xs text-[var(--success)] flex items-center gap-1">
