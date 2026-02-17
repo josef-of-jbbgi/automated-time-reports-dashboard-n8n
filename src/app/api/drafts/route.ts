@@ -30,9 +30,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'date parameter required' }, { status: 400 });
     }
 
-    let formula = `DATESTR({Date})='${date}'`;
+    // Exclude Discarded drafts — only return Generated, Selected, Sent
+    let formula = `AND(DATESTR({Date})='${date}', {Draft Status}!='Discarded')`;
     if (type) {
-      formula = `AND(DATESTR({Date})='${date}', {Type}='${type}')`;
+      formula = `AND(DATESTR({Date})='${date}', {Type}='${type}', {Draft Status}!='Discarded')`;
     }
 
     const records = await fetchRecords(TABLE, {
