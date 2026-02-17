@@ -21,7 +21,7 @@ export default function TaskList() {
   const { tasks, isLoading, error, mutate: mutateTasks } = useTasks();
   const { mutate: mutateMiddayLogs } = useMiddayLogs();
   const { toast } = useToast();
-  const { isProcessing } = useAgentStatus();
+  const { processingTargets } = useAgentStatus();
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 
   const { internalTasks, clientTasks } = useMemo(() => {
@@ -79,7 +79,7 @@ export default function TaskList() {
         Today&apos;s Tasks
       </h2>
 
-      {isProcessing && (
+      {processingTargets.has('tasks') && (
         <div className="flex items-center gap-2 px-3 py-2 mb-2 rounded-md border border-purple-800/50 bg-purple-900/20">
           <span className="inline-block w-2 h-2 rounded-full bg-purple-400 animate-pulse" />
           <span className="text-xs text-purple-300">Agent is updating tasks...</span>

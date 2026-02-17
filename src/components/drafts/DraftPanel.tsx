@@ -24,7 +24,7 @@ export default function DraftPanel({ type }: DraftPanelProps) {
   const { drafts, isLoading, mutate: mutateDrafts } = useDrafts(undefined, type);
   const { dailyLog, mutate: mutateDailyLog } = useDailyLog();
   const { toast } = useToast();
-  const { isProcessing } = useAgentStatus();
+  const { processingTargets } = useAgentStatus();
 
   const [selectedVersion, setSelectedVersion] = useState('');
   const [editorOpen, setEditorOpen] = useState(false);
@@ -63,8 +63,10 @@ export default function DraftPanel({ type }: DraftPanelProps) {
   const sentTime = type === 'Time-In' ? dailyLog?.timeInSentAt : dailyLog?.timeOutSentAt;
 
   // Status rendering
+  const agentTargetsThis = processingTargets.has(type === 'Time-In' ? 'time-in' : 'time-out');
+
   function renderStatus() {
-    if (isProcessing) {
+    if (agentTargetsThis && !sentDraft) {
       return (
         <span className="text-xs text-purple-400 flex items-center gap-1">
           <span className="inline-block w-2 h-2 rounded-full bg-purple-400 animate-pulse" />
