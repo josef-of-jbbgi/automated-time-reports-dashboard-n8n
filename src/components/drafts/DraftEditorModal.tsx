@@ -39,9 +39,15 @@ export default function DraftEditorModal({
   const { toast } = useToast();
   const promptRef = useRef<HTMLTextAreaElement>(null);
 
+  // Tracks whether the next OnChange from LexicalEditor is from initialization
+  // (not a user edit). Used to sync originalBody with the round-tripped markdown
+  // so hasChanges is accurate and auto-save won't corrupt data.
+  const editorInitRef = useRef(false);
+
   const [selectedVersion, setSelectedVersion] = useState(initialVersion);
   const [editedBody, setEditedBody] = useState('');
   const [originalBody, setOriginalBody] = useState('');
+  const [ready, setReady] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [showSendConfirm, setShowSendConfirm] = useState(false);
@@ -56,25 +62,31 @@ export default function DraftEditorModal({
   const selectedDraft = drafts.find(d => d.versionLabel === selectedVersion) || drafts[0];
   const hasChanges = editedBody !== originalBody;
 
-  // Initialize body when modal opens or version changes
+  // Single initialization effect when modal opens
   useEffect(() => {
-    if (isOpen && selectedDraft) {
-      setEditedBody(selectedDraft.body);
-      setOriginalBody(selectedDraft.body);
+    if (!isOpen) {
+      setReady(false);
+      return;
+    }
+
+    const version = initialVersion;
+    const draft = drafts.find(d => d.versionLabel === version) || drafts[0];
+
+    setSelectedVersion(version);
+    setShowSendConfirm(false);
+    setViewMode('split');
+    setPromptText('');
+
+    if (draft) {
+      setEditedBody(draft.body);
+      setOriginalBody(draft.body);
+      editorInitRef.current = true;
       setEditorKey(k => k + 1);
       setUndoBody(null);
+      setReady(true);
     }
-  }, [isOpen, selectedDraft]);
-
-  // Reset state when modal opens
-  useEffect(() => {
-    if (isOpen) {
-      setSelectedVersion(initialVersion);
-      setShowSendConfirm(false);
-      setViewMode('split');
-      setPromptText('');
-    }
-  }, [isOpen, initialVersion]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   // Escape key handler
   useEffect(() => {
@@ -111,6 +123,16 @@ export default function DraftEditorModal({
       setIsSaving(false);
     }
     setSelectedVersion(version);
+
+    // Directly initialize body for the new version — no effect dependency needed
+    const draft = drafts.find(d => d.versionLabel === version) || drafts[0];
+    if (draft) {
+      setEditedBody(draft.body);
+      setOriginalBody(draft.body);
+      editorInitRef.current = true;
+      setEditorKey(k => k + 1);
+      setUndoBody(null);
+    }
   }
 
   async function handleSave() {
@@ -146,6 +168,13 @@ export default function DraftEditorModal({
   }
 
   const handleEditorChange = useCallback((markdown: string) => {
+    // After each editor mount, the OnChangePlugin fires immediately with the
+    // round-tripped markdown (which may differ from the raw DB value in whitespace).
+    // Sync originalBody to match so hasChanges stays false until the user truly edits.
+    if (editorInitRef.current) {
+      editorInitRef.current = false;
+      setOriginalBody(markdown);
+    }
     setEditedBody(markdown);
   }, []);
 
@@ -300,13 +329,31 @@ export default function DraftEditorModal({
         {/* Editor pane (Lexical + prompt bar) */}
         {viewMode === 'split' && (
           <div className="flex-1 flex flex-col border-b lg:border-b-0 lg:border-r border-[var(--border)] min-h-0">
-            {/* Lexical editor */}
+            {/* Active draft indicator */}
+            <div className="flex items-center gap-2 px-4 py-2 border-b border-[var(--border)] bg-[var(--bg-primary)]">
+              <span className="inline-block w-2 h-2 rounded-full bg-[var(--accent)] animate-pulse" />
+              <span className="text-xs font-medium text-[var(--text-secondary)]">
+                Editing: {selectedDraft?.versionLabel}
+              </span>
+              <span className="text-xs text-[var(--text-muted)]">&mdash;</span>
+              <span className="text-xs text-[var(--text-muted)] truncate">
+                {selectedDraft?.draftTitle}
+              </span>
+            </div>
+
+            {/* Lexical editor — only render once body is loaded to avoid empty flash */}
             <div className="flex-1 flex flex-col min-h-0">
-              <LexicalEditor
-                key={editorKey}
-                initialMarkdown={editedBody}
-                onChange={handleEditorChange}
-              />
+              {ready ? (
+                <LexicalEditor
+                  key={editorKey}
+                  initialMarkdown={editedBody}
+                  onChange={handleEditorChange}
+                />
+              ) : (
+                <div className="flex-1 flex items-center justify-center text-sm text-[var(--text-muted)]">
+                  Loading editor…
+                </div>
+              )}
             </div>
 
             {/* AI Prompt bar */}
@@ -364,7 +411,15 @@ export default function DraftEditorModal({
 
         {/* Live preview */}
         <div className={`flex-1 overflow-y-auto p-4 ${viewMode === 'preview' ? '' : 'hidden lg:block'}`}>
-          <div className="text-xs text-[var(--text-muted)] mb-2 uppercase tracking-wide">Preview</div>
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-xs text-[var(--text-muted)] uppercase tracking-wide">Preview</div>
+            {viewMode === 'preview' && selectedDraft && (
+              <div className="flex items-center gap-1.5">
+                <span className="inline-block w-2 h-2 rounded-full bg-[var(--accent)] animate-pulse" />
+                <span className="text-xs text-[var(--text-secondary)]">{selectedDraft.versionLabel}</span>
+              </div>
+            )}
+          </div>
           <div className="bg-[var(--bg-secondary)] border border-[var(--border)] rounded-md p-4">
             {isGenerating && (
               <div className="flex items-center gap-2 mb-3 text-xs text-purple-400">
