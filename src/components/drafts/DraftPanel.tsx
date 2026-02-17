@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useDrafts } from '@/lib/hooks/useDrafts';
 import { useDailyLog } from '@/lib/hooks/useDailyLog';
 import { formatTime } from '@/lib/utils';
-import { PromptMessage } from '@/lib/types';
+import { Draft, PromptMessage } from '@/lib/types';
 import Card from '@/components/ui/Card';
 import Skeleton from '@/components/ui/Skeleton';
 import EmptyState from '@/components/ui/EmptyState';
@@ -29,8 +29,24 @@ export default function DraftPanel({ type }: DraftPanelProps) {
   const [showSentBody, setShowSentBody] = useState(false);
   const [conversationHistory, setConversationHistory] = useState<PromptMessage[]>([]);
 
-  // Only show drafts that have body content
-  const availableDrafts = drafts.filter(d => d.body.trim().length > 0);
+  // Filter, de-duplicate, and sort drafts:
+  // 1. Only drafts with body content and non-Sent status (Sent drafts handled separately)
+  // 2. De-duplicate by version label — keep the latest per version
+  // 3. Sort: Version A → B → C
+  const availableDrafts = (() => {
+    const withBody = drafts.filter(d => d.body.trim().length > 0 && d.draftStatus !== 'Sent');
+    const byVersion = new Map<string, Draft>();
+    for (const d of withBody) {
+      const existing = byVersion.get(d.versionLabel);
+      if (!existing || d.generatedAt > existing.generatedAt) {
+        byVersion.set(d.versionLabel, d);
+      }
+    }
+    const versionOrder = ['Version A', 'Version B', 'Version C'];
+    return Array.from(byVersion.values()).sort(
+      (a, b) => versionOrder.indexOf(a.versionLabel) - versionOrder.indexOf(b.versionLabel)
+    );
+  })();
 
   const selectedDraft = availableDrafts.find(d => d.versionLabel === selectedVersion) || availableDrafts[0];
 
@@ -105,15 +121,25 @@ export default function DraftPanel({ type }: DraftPanelProps) {
       body: JSON.stringify({ draftRecordId: draftId }),
     });
     if (!res.ok) throw new Error('Send failed');
-    const data = await res.json();
-    const totalHoursInfo = data.totalHours ? ` · ${data.totalHours}h` : '';
-    toast(`${type} sent${totalHoursInfo}`, 'success');
-    mutateDrafts();
-    mutateDailyLog();
+    toast(`${type} sent`, 'success');
+    optimisticMarkSent(draftId);
   }
 
   function handleSendSuccess() {
-    mutateDrafts();
+    optimisticMarkSent(selectedDraft?.id);
+  }
+
+  // Optimistically mark a draft as Sent in the SWR cache so the UI updates instantly.
+  // n8n processes the email in the background; SWR will revalidate and reconcile later.
+  function optimisticMarkSent(draftId?: string) {
+    if (!draftId) return;
+    mutateDrafts(
+      (current) =>
+        current?.map(d =>
+          d.id === draftId ? { ...d, draftStatus: 'Sent' as const } : d
+        ),
+      { revalidate: true }
+    );
     mutateDailyLog();
   }
 
