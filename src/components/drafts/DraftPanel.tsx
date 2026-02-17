@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useDrafts } from '@/lib/hooks/useDrafts';
 import { useDailyLog } from '@/lib/hooks/useDailyLog';
 import { formatTime } from '@/lib/utils';
@@ -129,8 +129,46 @@ export default function DraftPanel({ type }: DraftPanelProps) {
     optimisticMarkSent(selectedDraft?.id);
   }
 
-  // Optimistically mark a draft as Sent in the SWR cache so the UI updates instantly.
-  // n8n processes the email in the background; SWR will revalidate and reconcile later.
+  // ── Sent-confirmation polling ──
+  // After optimistic update, poll Airtable every 3s for up to 30s to confirm
+  // the draft was actually marked Sent by n8n (TI/TO Mark Sent runs ~2-5s after webhook).
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollCountRef = useRef(0);
+  const MAX_POLLS = 10; // 10 × 3s = 30s
+
+  const stopPolling = useCallback(() => {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+    pollCountRef.current = 0;
+  }, []);
+
+  const startSentPolling = useCallback(() => {
+    stopPolling();
+    pollCountRef.current = 0;
+    pollRef.current = setInterval(() => {
+      pollCountRef.current += 1;
+      mutateDrafts(); // re-fetch from Airtable
+      mutateDailyLog();
+      if (pollCountRef.current >= MAX_POLLS) {
+        stopPolling();
+      }
+    }, 3000);
+  }, [mutateDrafts, mutateDailyLog, stopPolling]);
+
+  // Stop polling once a Sent draft is confirmed from real data
+  useEffect(() => {
+    if (sentDraft && pollRef.current) {
+      stopPolling();
+    }
+  }, [sentDraft, stopPolling]);
+
+  // Cleanup on unmount
+  useEffect(() => stopPolling, [stopPolling]);
+
+  // Optimistically mark a draft as Sent in the SWR cache so the UI updates instantly,
+  // then start polling Airtable to confirm the real status.
   function optimisticMarkSent(draftId?: string) {
     if (!draftId) return;
     mutateDrafts(
@@ -138,9 +176,10 @@ export default function DraftPanel({ type }: DraftPanelProps) {
         current?.map(d =>
           d.id === draftId ? { ...d, draftStatus: 'Sent' as const } : d
         ),
-      { revalidate: true }
+      { revalidate: false }
     );
     mutateDailyLog();
+    startSentPolling();
   }
 
   // Sent state — banner is the primary content, email body is collapsible
