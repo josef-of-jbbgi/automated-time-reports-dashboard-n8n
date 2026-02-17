@@ -8,12 +8,14 @@ import Card from '@/components/ui/Card';
 import AgentInput from './AgentInput';
 import type { FileAttachment } from './AgentInput';
 import AgentMessage from './AgentMessage';
+import { useAgentStatus } from '@/lib/context/AgentContext';
 
 export default function PromptWindow() {
   const { messages, isLoading, sendMessage } = useAgent();
   const { mutate: mutateTasks } = useTasks();
   const { mutate: mutateTIDrafts } = useDrafts(undefined, 'Time-In');
   const { mutate: mutateTODrafts } = useDrafts(undefined, 'Time-Out');
+  const { setProcessing } = useAgentStatus();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -21,11 +23,16 @@ export default function PromptWindow() {
   }, [messages]);
 
   async function handleSend(prompt: string, file?: FileAttachment) {
-    const response = await sendMessage(prompt, file);
-    mutateTasks();
-    if (response?.draftsUpdated) {
-      mutateTIDrafts();
-      mutateTODrafts();
+    setProcessing(true);
+    try {
+      const response = await sendMessage(prompt, file);
+      mutateTasks();
+      if (response?.draftsUpdated) {
+        mutateTIDrafts();
+        mutateTODrafts();
+      }
+    } finally {
+      setProcessing(false);
     }
   }
 

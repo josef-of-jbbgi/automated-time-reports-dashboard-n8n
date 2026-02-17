@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import { ToastProvider } from '@/components/ui/Toast';
+import { AgentProvider } from '@/lib/context/AgentContext';
 import OfflineBanner from '@/components/layout/OfflineBanner';
 import './globals.css';
 
@@ -20,8 +21,10 @@ export default function RootLayout({
     <html lang="en" className="dark">
       <body className={`${inter.variable} font-sans antialiased bg-[var(--bg-primary)]`}>
         <ToastProvider>
-          <OfflineBanner />
-          {children}
+          <AgentProvider>
+            <OfflineBanner />
+            {children}
+          </AgentProvider>
         </ToastProvider>
       </body>
     </html>
