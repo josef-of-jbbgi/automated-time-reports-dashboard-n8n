@@ -29,7 +29,13 @@ export async function callWebhook(
       throw new Error(`n8n webhook failed (${res.status}): ${text}`);
     }
 
-    return await res.json();
+    // Some webhooks (responseImmediately) return plain text, not JSON
+    const text = await res.text();
+    try {
+      return JSON.parse(text);
+    } catch {
+      return { message: text };
+    }
   } finally {
     clearTimeout(timeout);
   }
