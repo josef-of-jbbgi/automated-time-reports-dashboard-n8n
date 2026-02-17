@@ -41,9 +41,7 @@ export default function DraftActions({
 
       if (!res.ok) throw new Error('Send failed');
 
-      const data = await res.json();
-      const totalHoursInfo = data.totalHours ? ` · ${data.totalHours}h` : '';
-      toast(`${type} sent${totalHoursInfo}`, 'success');
+      toast(`${type} sent`, 'success');
       setShowModal(false);
       onSendSuccess();
     } catch {

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { callWebhook } from '@/lib/n8n';
 import { N8N } from '@/lib/constants';
-import { SendTimeOutResponse } from '@/lib/types';
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,8 +11,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'draftRecordId required' }, { status: 400 });
     }
 
-    const result = await callWebhook(N8N.ENDPOINTS.SEND_TIME_OUT, { draftRecordId });
-    return NextResponse.json(result as SendTimeOutResponse);
+    // n8n webhook responds immediately; email sends in the background
+    await callWebhook(N8N.ENDPOINTS.SEND_TIME_OUT, { draftRecordId });
+    return NextResponse.json({ success: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json({ error: message }, { status: 500 });
